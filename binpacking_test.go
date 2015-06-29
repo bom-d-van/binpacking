@@ -1,4 +1,4 @@
-package shipping
+package binpacking
 
 import (
 	"fmt"

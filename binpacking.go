@@ -1,4 +1,6 @@
-package shipping
+// Package binpacking is a Golang 3D Bin Packing Implementation
+//
+package binpacking
 
 import (
 	"errors"
