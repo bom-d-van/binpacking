@@ -9,18 +9,18 @@ import (
 
 var (
 	BoxSamples = []Box{
-		{Width: 220, Height: 160, Depth: 100, Weight: 110, Name: "G5"},
-		{Width: 260, Height: 145, Depth: 145, Weight: 120, Name: "S5"},
-		{Width: 270, Height: 185, Depth: 110, Weight: 140, Name: "A42"},
-		{Width: 310, Height: 220, Depth: 140, Weight: 210, Name: "G3"},
-		{Width: 300, Height: 210, Depth: 200, Weight: 250, Name: "No5"},
-		{Width: 300, Height: 300, Depth: 130, Weight: 290, Name: "SA12"},
-		{Width: 370, Height: 270, Depth: 150, Weight: 300, Name: "Chu"},
-		{Width: 300, Height: 300, Depth: 250, Weight: 360, Name: "Sho"},
-		{Width: 470, Height: 280, Depth: 210, Weight: 400, Name: "GP2"},
-		{Width: 430, Height: 315, Depth: 200, Weight: 430, Name: "A4"},
-		{Width: 330, Height: 330, Depth: 350, Weight: 500, Name: "S37"},
-		{Width: 465, Height: 350, Depth: 370, Weight: 650, Name: "KK"},
+		{Width: 220, Height: 160, Depth: 100, Weight: 110, Name: "Box1"},
+		{Width: 260, Height: 145, Depth: 145, Weight: 120, Name: "Box2"},
+		{Width: 270, Height: 185, Depth: 110, Weight: 140, Name: "Box3"},
+		{Width: 310, Height: 220, Depth: 140, Weight: 210, Name: "Box4"},
+		{Width: 300, Height: 210, Depth: 200, Weight: 250, Name: "Box5"},
+		{Width: 300, Height: 300, Depth: 130, Weight: 290, Name: "Box6"},
+		{Width: 370, Height: 270, Depth: 150, Weight: 300, Name: "Box7"},
+		{Width: 300, Height: 300, Depth: 250, Weight: 360, Name: "Box8"},
+		{Width: 470, Height: 280, Depth: 210, Weight: 400, Name: "Box9"},
+		{Width: 430, Height: 315, Depth: 200, Weight: 430, Name: "Box10"},
+		{Width: 330, Height: 330, Depth: 350, Weight: 500, Name: "Box11"},
+		{Width: 465, Height: 350, Depth: 370, Weight: 650, Name: "Box12"},
 	}
 )
 
