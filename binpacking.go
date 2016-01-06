@@ -3,7 +3,7 @@
 package binpacking
 
 import (
-	"errors"
+	"fmt"
 	"sort"
 )
 
@@ -35,6 +35,25 @@ const (
 	RT6                     // w, d, h
 )
 
+func (rt RotationType) String() string {
+	switch rt {
+	case RT1:
+		return "RT1 (w, h, d)"
+	case RT2:
+		return "RT2 (h, w, d)"
+	case RT3:
+		return "RT3 (h, d, w)"
+	case RT4:
+		return "RT4 (d, h, w)"
+	case RT5:
+		return "RT5 (d, w, h)"
+	case RT6:
+		return "RT6 (w, d, h)"
+	}
+
+	return "wrong type"
+}
+
 type Box struct {
 	Name   string
 	Width  int // unit: mm
@@ -45,6 +64,17 @@ type Box struct {
 	Items []BoxItem
 }
 
+func (b Box) String() string {
+	r := fmt.Sprintf(
+		"box (w: %d, h: %d, d: %d, weight: %d, name: %s) itemsCount: %d",
+		b.Width, b.Height, b.Depth, b.Weight, b.Name, len(b.Items),
+	)
+	for i, item := range b.Items {
+		r += fmt.Sprintf("\n  item %d: %s", i, item)
+	}
+	return r
+}
+
 func (b Box) IsValid() bool {
 	return b.volume() != 0
 }
@@ -53,32 +83,7 @@ func (b Box) volume() int {
 	return b.Width * b.Height * b.Depth
 }
 
-func (b *Box) place(item Item, pos [3]int) (fit bool) {
-	bi := BoxItem{Item: item, Pos: pos}
-	for i := 0; i < 6; i++ {
-		bi.RType = RotationType(i)
-		d := bi.Dimensions()
-		if b.Width < pos[0]+d[0] || b.Height < pos[1]+d[1] || b.Depth < pos[2]+d[2] {
-			continue
-		}
-		fit = true
-		for _, item := range b.Items {
-			if item.intersect(bi) {
-				fit = false
-				break
-			}
-		}
-		if fit {
-			b.Items = append(b.Items, bi)
-			break
-		}
-		return
-	}
-
-	return
-}
-
-func (b Box) totalWeight() (w int) {
+func (b Box) TotalWeight() (w int) {
 	w += b.Weight
 	for _, item := range b.Items {
 		w += item.GetWeight()
@@ -90,10 +95,26 @@ func (b Box) size() (s int) {
 	return b.Width + b.Height + b.Depth
 }
 
+func (b Box) nonBoxItems() (r []Item) {
+	for _, item := range b.Items {
+		r = append(r, item.Item)
+	}
+	return
+}
+
 type BoxItem struct {
 	Item
 	Pos   [3]int // (w, h, d)
 	RType RotationType
+}
+
+func (bi BoxItem) String() string {
+	return fmt.Sprintf(
+		"item(w: %d, h: %d, d: %d, weight: %d) pos(w: %d, h: %d, d: %d) rtype(%s)",
+		bi.Item.GetWidth(), bi.Item.GetHeight(), bi.Item.GetDepth(), bi.Item.GetWeight(),
+		bi.Pos[0], bi.Pos[1], bi.Pos[2],
+		bi.RType,
+	)
 }
 
 func (bi *BoxItem) volume() int {
@@ -191,72 +212,123 @@ func (is Items) Swap(i int, j int) {
 	is[j] = swap
 }
 
+// Original Algorithm: https://github.com/bom-d-van/binpacking/blob/master/erick_dube_507-034.pdf
+// The current implementation is based on it, but with some tweaks to fit our requirements.
+//
+// The original algorithm is designed for identical bins but our requirements is made for
+// bins in various sizes
 func Pack(notPacked []Item) (boxes []Box, err error) {
 	sort.Sort(Items(notPacked))
 	for len(notPacked) > 0 {
 		toPack := notPacked
-		notPacked = []Item{} // clear notPacked
+		// notPacked = []Item{} // clear notPacked
 
 		currentBin := pickBox(toPack[0])
 		if !currentBin.IsValid() {
-			err = errors.New("item too big")
+			err = fmt.Errorf(
+				"item too big: {width: %d, height: %d, depth: %d, weight: %d}",
+				toPack[0].GetWidth(),
+				toPack[0].GetHeight(),
+				toPack[0].GetDepth(),
+				toPack[0].GetWeight(),
+			)
 			return
 		}
 
-	repack:
-		// totalWeight := currentBin.Weight
-		if !currentBin.place(toPack[0], [3]int{}) {
-			err = errors.New("item too big")
-			return
+		notPacked = pack(&currentBin, toPack, true)
+
+		if len(currentBin.Items) > 0 {
+			boxes = append(boxes, currentBin)
 		}
-		// totalWeight += toPack[0].weight()
+	}
 
-		for _, currenItem := range toPack[1:] {
-			var fitted bool
-			// if totalWeight+currenItem.weight() > weightLimit {
-			// 	notPacked = append(notPacked, currenItem)
-			// 	continue
-			// }
-		lookup:
-			for p := 0; p < 3; p++ {
-				for _, binItem := range currentBin.Items {
-					var pos [3]int
-					switch p {
-					case 0:
-						pos = [3]int{binItem.Pos[0] + binItem.GetWidth(), binItem.Pos[1], binItem.Pos[2]}
-					case 1:
-						pos = [3]int{binItem.Pos[0], binItem.Pos[1] + binItem.GetHeight(), binItem.Pos[2]}
-					case 2:
-						pos = [3]int{binItem.Pos[0], binItem.Pos[1], binItem.Pos[2] + binItem.GetDepth()}
-					}
+	return
+}
 
-					if currentBin.place(currenItem, pos) {
+func pack(currentBin *Box, toPack []Item, replaceBin bool) (notPacked []Item) {
+	if !currentBin.place(toPack[0], [3]int{}) {
+		if nbin := getBiggerBox(*currentBin); nbin.IsValid() {
+			*currentBin = nbin
+			return pack(currentBin, toPack, replaceBin)
+		}
+
+		return toPack
+	}
+
+	for _, currenItem := range toPack[1:] {
+		var fitted bool
+	lookup:
+		for p := 0; p < 3; p++ {
+			for _, binItem := range currentBin.Items {
+				var pos [3]int
+				switch p {
+				case 0:
+					pos = [3]int{binItem.Pos[0] + binItem.GetWidth(), binItem.Pos[1], binItem.Pos[2]}
+				case 1:
+					pos = [3]int{binItem.Pos[0], binItem.Pos[1] + binItem.GetHeight(), binItem.Pos[2]}
+				case 2:
+					pos = [3]int{binItem.Pos[0], binItem.Pos[1], binItem.Pos[2] + binItem.GetDepth()}
+				}
+
+				if currentBin.place(currenItem, pos) {
+					fitted = true
+					break lookup
+				}
+			}
+		}
+		if !fitted {
+			if replaceBin {
+				for nbin := getBiggerBox(*currentBin); nbin.IsValid(); nbin = getBiggerBox(nbin) {
+					left := pack(&nbin, append(currentBin.nonBoxItems(), currenItem), false)
+					if len(left) == 0 {
+						*currentBin = nbin
 						fitted = true
-						break lookup
+						break
 					}
 				}
 			}
-			if !fitted {
-				if nbin := getBiggerBox(currentBin); nbin.IsValid() {
-					currentBin = nbin
-					goto repack
-				}
 
+			if !fitted {
 				notPacked = append(notPacked, currenItem)
 			}
 		}
-		boxes = append(boxes, currentBin)
+	}
+
+	return
+}
+
+func (b *Box) place(item Item, pos [3]int) (fit bool) {
+	bi := BoxItem{Item: item, Pos: pos}
+	for i := 0; i < 6; i++ {
+		bi.RType = RotationType(i)
+		d := bi.Dimensions()
+		if b.Width < pos[0]+d[0] || b.Height < pos[1]+d[1] || b.Depth < pos[2]+d[2] {
+			continue
+		}
+		fit = true
+		for _, item := range b.Items {
+			if item.intersect(bi) {
+				fit = false
+				break
+			}
+		}
+		if fit {
+			b.Items = append(b.Items, bi)
+			break
+		}
+		return
 	}
 
 	return
 }
 
 func pickBox(item Item) Box {
-	v := item.GetWidth() * item.GetHeight() * item.GetDepth()
 	for _, b := range BoxSamples {
-		if b.volume() >= v {
-			return b
+		if !b.place(item, [3]int{}) {
+			continue
 		}
+		b.Items = []BoxItem{}
+		return b
 	}
 	return Box{}
 }
